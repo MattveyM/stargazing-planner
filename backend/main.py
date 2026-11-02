@@ -1,14 +1,14 @@
 """Stargazing Planner API (FastAPI back end)."""
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import get_connection
-from models import Site
+from models import ForecastHour, Site
 
 app = FastAPI(
     title="Stargazing Planner API",
     description="Finds the best night and place to stargaze in the Pacific Northwest.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # Allow the React app (running on port 5173) to call this API from the browser.
@@ -43,3 +43,21 @@ def get_site(site_id: int):
     if site is None:
         raise HTTPException(status_code=404, detail="Site not found")
     return site
+
+
+@app.get("/api/sites/{site_id}/forecast", response_model=list[ForecastHour])
+def get_site_forecast(site_id: int, hours: int = Query(48, ge=1, le=168, description="How many hours ahead to return")):
+    """Return the saved hourly cloud forecast for one site, starting from the current hour."""
+    with get_connection() as conn:
+        if conn.execute("SELECT 1 FROM sites WHERE id = %s", (site_id,)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Site not found")
+        return conn.execute(
+            """
+            SELECT forecast_hour, cloud_total, cloud_low, cloud_mid, cloud_high, humidity, downloaded_at
+            FROM forecasts
+            WHERE site_id = %s AND forecast_hour >= date_trunc('hour', NOW())
+            ORDER BY forecast_hour
+            LIMIT %s
+            """,
+            (site_id, hours),
+        ).fetchall()

@@ -91,6 +91,4 @@ CREATE TABLE observations (
     recorded_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (site_id, night)
 );
-
-CREATE INDEX idx_forecasts_site_hour   ON forecasts (site_id, forecast_hour);
-CREATE INDEX idx_predictions_site_night ON predictions (site_id, night);
+-- (No extra indexes needed: each UNIQUE constraint above already creates one.)
