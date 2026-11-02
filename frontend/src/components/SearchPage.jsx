@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchSites, geocodePlace } from "../api";
 import { distanceMiles, estimateDriveMinutes, formatMinutes } from "../utils/distance";
+import MapView from "./MapView";
 import SiteList from "./SiteList";
 import "./SearchPage.css";
 
@@ -13,6 +14,7 @@ export default function SearchPage() {
   // Data from the back end
   const [allSites, setAllSites] = useState([]);
   const [results, setResults] = useState(null); // null = no search yet
+  const [searchedFrom, setSearchedFrom] = useState(null); // the point the current results are for
 
   // Messages for the user
   const [status, setStatus] = useState("Connecting to the server...");
@@ -86,6 +88,7 @@ export default function SearchPage() {
       .sort((a, b) => a.driveMinutes - b.driveMinutes);
 
     setResults(nearby);
+    setSearchedFrom(point);
     setStatus(`${nearby.length} sites within about ${formatMinutes(maxDriveMinutes)} of ${point.label}.`);
   }
 
@@ -136,6 +139,9 @@ export default function SearchPage() {
 
       {error && <p className="error">{error}</p>}
       {status && <p className="status">{status}</p>}
+
+      {/* Before a search the map shows every site; after a search it shows only the results. */}
+      <MapView sites={results ?? allSites} startPoint={searchedFrom} />
 
       {results && (
         <section>

@@ -1,4 +1,4 @@
-.search-page { max-width: 900px; margin: 0 auto; padding: 32px 16px; }
+.search-page { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
 .search-page h1 { margin-bottom: 4px; }
 .subtitle { color: #555; margin-top: 0; }
 
@@ -22,6 +22,14 @@ button.secondary { background: #fff; border: 1px solid #1f2a44; color: #1f2a44; 
 .note { font-size: 13px; color: #666; }
 .empty { color: #555; }
 
+/* Map */
+.map-wrapper { margin: 16px 0 24px; }
+.map { height: 460px; width: 100%; border-radius: 10px; border: 1px solid #ddd; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; font-size: 13px; color: #444; }
+.legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff; box-shadow: 0 0 0 1px #999; vertical-align: -1px; }
+.popup-notes { margin: 6px 0 0; color: #555; font-size: 12px; }
+
+/* Results table */
 .site-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .site-table th, .site-table td { padding: 8px; border-bottom: 1px solid #e5e5e5; text-align: left; }
 .site-table th { background: #f4f5f7; }
@@ -29,5 +37,6 @@ button.secondary { background: #fff; border: 1px solid #1f2a44; color: #1f2a44; 
 
 @media (max-width: 600px) {
   .location-row { flex-direction: column; }
+  .map { height: 340px; }
   .site-table { font-size: 12px; }
 }
