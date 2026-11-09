@@ -1,14 +1,17 @@
 """Stargazing Planner API (FastAPI back end)."""
+from datetime import datetime
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from astronomy import LOCAL_TZ
 from db import get_connection
-from models import ForecastHour, Site
+from models import ForecastHour, NightScore, Site
 
 app = FastAPI(
     title="Stargazing Planner API",
     description="Finds the best night and place to stargaze in the Pacific Northwest.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # Allow the React app (running on port 5173) to call this API from the browser.
@@ -60,4 +63,25 @@ def get_site_forecast(site_id: int, hours: int = Query(48, ge=1, le=168, descrip
             LIMIT %s
             """,
             (site_id, hours),
+        ).fetchall()
+
+
+@app.get("/api/sites/{site_id}/nights", response_model=list[NightScore])
+def get_site_nights(site_id: int):
+    """Return the 0-100 score and its breakdown for each of the next 7 nights (newest prediction for each night)."""
+    today = datetime.now(LOCAL_TZ).date()
+    with get_connection() as conn:
+        if conn.execute("SELECT 1 FROM sites WHERE id = %s", (site_id,)).fetchone() is None:
+            raise HTTPException(status_code=404, detail="Site not found")
+        return conn.execute(
+            """
+            SELECT DISTINCT ON (night)
+                   night, score, cloud_score, moon_score, darkness_score, light_score,
+                   dark_start, dark_end, dark_hours, moon_percent, avg_cloud, predicted_on
+            FROM predictions
+            WHERE site_id = %s AND night >= %s
+            ORDER BY night, predicted_on DESC
+            LIMIT 7
+            """,
+            (site_id, today),
         ).fetchall()

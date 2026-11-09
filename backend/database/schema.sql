@@ -78,6 +78,11 @@ CREATE TABLE predictions (
     moon_score      SMALLINT,
     darkness_score  SMALLINT,
     light_score     SMALLINT,
+    dark_start      TIMESTAMPTZ,                          -- when full darkness starts that night
+    dark_end        TIMESTAMPTZ,                          -- when it ends the next morning
+    dark_hours      REAL,
+    moon_percent    SMALLINT CHECK (moon_percent BETWEEN 0 AND 100),
+    avg_cloud       SMALLINT CHECK (avg_cloud BETWEEN 0 AND 100),
     predicted_on    DATE     NOT NULL DEFAULT CURRENT_DATE,
     UNIQUE (site_id, night, predicted_on)
 );
