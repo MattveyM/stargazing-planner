@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Outlet } from "react-router-dom";
 import { fetchSites, geocodePlace } from "../api";
 import { distanceMiles, estimateDriveMinutes, formatMinutes } from "../utils/distance";
 import MapView from "./MapView";
@@ -152,6 +153,9 @@ export default function SearchPage() {
           <SiteList sites={results} />
         </section>
       )}
+
+      {/* Site details (/sites/:siteId) open here, on top of the search page */}
+      <Outlet />
     </main>
   );
 }

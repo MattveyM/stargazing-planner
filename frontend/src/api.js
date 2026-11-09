@@ -10,6 +10,23 @@ export async function fetchSites() {
   return response.json();
 }
 
+// Shared helper: GET a path on our API and return the JSON (or throw a clear error)
+async function getJson(path) {
+  const response = await fetch(`${API_URL}${path}`);
+  if (response.status === 404) throw new Error("Not found");
+  if (!response.ok) throw new Error(`Server error ${response.status}`);
+  return response.json();
+}
+
+// GET /api/sites/{id} -> one site
+export const fetchSite = (siteId) => getJson(`/api/sites/${siteId}`);
+
+// GET /api/sites/{id}/nights -> 0-100 score + breakdown for the next 7 nights
+export const fetchNights = (siteId) => getJson(`/api/sites/${siteId}/nights`);
+
+// GET /api/sites/{id}/forecast -> hourly cloud forecast (up to 7 days)
+export const fetchForecast = (siteId, hours = 168) => getJson(`/api/sites/${siteId}/forecast?hours=${hours}`);
+
 // Turn a typed place name or zip code (like "Bothell" or "98011") into coordinates.
 // Uses Open-Meteo's free geocoding service (no API key needed).
 async function lookUp(name) {

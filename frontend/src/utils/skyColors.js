@@ -9,3 +9,10 @@ export const SKY_LEVELS = [
 export function bortleColor(bortle) {
   return SKY_LEVELS.find((level) => level.test(bortle)).color;
 }
+
+// Nightly score levels (0-100). Each comes with a word so color is never the only signal.
+export function scoreLevel(score) {
+  if (score >= 70) return { label: "Great", color: "#1a7f37", background: "#e3f2e8" };
+  if (score >= 45) return { label: "Fair", color: "#8a6510", background: "#fbf0d6" };
+  return { label: "Poor", color: "#b42318", background: "#fbe4e2" };
+}

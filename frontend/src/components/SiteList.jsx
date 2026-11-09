@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { formatMinutes } from "../utils/distance";
 
 // Shows a table of dark-sky sites. Each site may include distance and drive-time estimates.
@@ -16,6 +17,7 @@ export default function SiteList({ sites }) {
           <th>Est. drive</th>
           <th>Sky darkness</th>
           <th>Road access</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -29,6 +31,9 @@ export default function SiteList({ sites }) {
             <td>{site.driveMinutes != null ? formatMinutes(site.driveMinutes) : "-"}</td>
             <td>Bortle {site.bortle}</td>
             <td>{site.road_access}</td>
+            <td>
+              <Link to={`/sites/${site.id}`}>Details</Link>
+            </td>
           </tr>
         ))}
       </tbody>

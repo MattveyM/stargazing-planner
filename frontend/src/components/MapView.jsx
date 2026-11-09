@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import { Link } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import { formatMinutes } from "../utils/distance";
 import { SKY_LEVELS, bortleColor } from "../utils/skyColors";
@@ -64,6 +65,9 @@ export default function MapView({ sites, startPoint }) {
                 </>
               )}
               {site.notes && <p className="popup-notes">{site.notes}</p>}
+              <Link className="popup-link" to={`/sites/${site.id}`}>
+                View 7-night forecast →
+              </Link>
             </Popup>
           </CircleMarker>
         ))}
