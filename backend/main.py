@@ -1,17 +1,19 @@
 """Stargazing Planner API (FastAPI back end)."""
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from astronomy import LOCAL_TZ
 from db import get_connection
-from models import ForecastHour, NightScore, Site
+from drive_times import get_drive_times
+from models import CalendarNight, ForecastHour, NightScore, Rankings, Site
+from rankings import rank_sites
 
 app = FastAPI(
     title="Stargazing Planner API",
     description="Finds the best night and place to stargaze in the Pacific Northwest.",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 # Allow the React app (running on port 5173) to call this API from the browser.
@@ -85,3 +87,88 @@ def get_site_nights(site_id: int):
             """,
             (site_id, today),
         ).fetchall()
+
+
+# ---------- Rankings (Week 6): the search now runs on the server ----------
+
+def _check_night(night: date | None) -> date:
+    """Default to tonight; only allow the 7 nights we have forecasts for."""
+    today = datetime.now(LOCAL_TZ).date()
+    night = night or today
+    if not today <= night <= today + timedelta(days=6):
+        raise HTTPException(status_code=422, detail="night must be within the next 7 nights")
+    return night
+
+
+def _drive_source(results: list[dict]) -> str:
+    estimated = {site["drive_estimated"] for site in results}
+    if estimated == {False}:
+        return "openrouteservice"
+    return "estimate" if estimated == {True} else "mixed"
+
+
+@app.get("/api/rankings", response_model=Rankings)
+def get_rankings(
+    lat: float = Query(..., ge=-90, le=90, description="Starting latitude"),
+    lon: float = Query(..., ge=-180, le=180, description="Starting longitude"),
+    max_drive: int = Query(120, ge=15, le=480, description="Longest drive the user will make, in minutes"),
+    night: date | None = Query(None, description="Which night (YYYY-MM-DD). Default: tonight"),
+):
+    """Sites within the drive limit, ranked best first by score and drive time for one night."""
+    night = _check_night(night)
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT s.id, s.name, s.region, s.state, s.latitude, s.longitude, s.elevation_ft, s.bortle, s.road_access, s.notes,
+                   p.score, p.cloud_score, p.moon_score, p.darkness_score, p.light_score,
+                   p.dark_start, p.dark_end, p.moon_percent, p.avg_cloud
+            FROM sites s
+            LEFT JOIN LATERAL (            -- newest prediction for this site and night
+                SELECT * FROM predictions
+                WHERE site_id = s.id AND night = %s
+                ORDER BY predicted_on DESC LIMIT 1
+            ) p ON true
+            """,
+            (night,),
+        ).fetchall()
+    drive = get_drive_times(lat, lon, rows)
+    results = rank_sites(rows, drive, max_drive)
+    return {"night": night, "max_drive_minutes": max_drive, "drive_source": _drive_source(results), "results": results}
+
+
+@app.get("/api/rankings/nights", response_model=list[CalendarNight])
+def get_ranking_calendar(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    max_drive: int = Query(120, ge=15, le=480),
+):
+    """For each of the next 7 nights: the #1 site within the drive limit and its score (for the calendar)."""
+    today = datetime.now(LOCAL_TZ).date()
+    nights = [today + timedelta(days=i) for i in range(7)]
+    with get_connection() as conn:
+        sites = conn.execute(f"SELECT {SITE_COLUMNS} FROM sites").fetchall()
+        predictions = conn.execute(
+            """
+            SELECT DISTINCT ON (site_id, night) site_id, night, score
+            FROM predictions
+            WHERE night BETWEEN %s AND %s
+            ORDER BY site_id, night, predicted_on DESC
+            """,
+            (nights[0], nights[-1]),
+        ).fetchall()
+    drive = get_drive_times(lat, lon, sites)
+    scores = {(p["site_id"], p["night"]): p["score"] for p in predictions}
+
+    calendar = []
+    for night in nights:
+        rows = [{**site, "score": scores.get((site["id"], night))} for site in sites]
+        ranked = rank_sites(rows, drive, max_drive)
+        best = ranked[0] if ranked and ranked[0]["score"] is not None else None
+        calendar.append({
+            "night": night,
+            "sites_in_range": len(ranked),
+            "best_site_id": best["id"] if best else None,
+            "best_site_name": best["name"] if best else None,
+            "best_score": best["score"] if best else None,
+        })
+    return calendar
