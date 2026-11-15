@@ -27,6 +27,20 @@ export const fetchNights = (siteId) => getJson(`/api/sites/${siteId}/nights`);
 // GET /api/sites/{id}/forecast -> hourly cloud forecast (up to 7 days)
 export const fetchForecast = (siteId, hours = 168) => getJson(`/api/sites/${siteId}/forecast?hours=${hours}`);
 
+// GET /api/rankings -> sites within the drive limit, ranked best first for one night
+// (night = "YYYY-MM-DD", or null for tonight). Drive times come from OpenRouteService on the server.
+export function fetchRankings({ latitude, longitude, maxDrive, night }) {
+  const params = new URLSearchParams({ lat: latitude, lon: longitude, max_drive: maxDrive });
+  if (night) params.set("night", night);
+  return getJson(`/api/rankings?${params}`);
+}
+
+// GET /api/rankings/nights -> the #1 site and its score for each of the next 7 nights (for the calendar)
+export function fetchRankingCalendar({ latitude, longitude, maxDrive }) {
+  const params = new URLSearchParams({ lat: latitude, lon: longitude, max_drive: maxDrive });
+  return getJson(`/api/rankings/nights?${params}`);
+}
+
 // Turn a typed place name or zip code (like "Bothell" or "98011") into coordinates.
 // Uses Open-Meteo's free geocoding service (no API key needed).
 async function lookUp(name) {

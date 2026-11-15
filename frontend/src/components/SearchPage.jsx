@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { fetchSites, geocodePlace } from "../api";
-import { distanceMiles, estimateDriveMinutes, formatMinutes } from "../utils/distance";
+import { fetchRankingCalendar, fetchRankings, fetchSites, geocodePlace } from "../api";
+import { formatMinutes } from "../utils/distance";
+import { formatNight } from "../utils/time";
 import MapView from "./MapView";
+import NightCalendar from "./NightCalendar";
 import SiteList from "./SiteList";
 import "./SearchPage.css";
 
@@ -14,14 +16,17 @@ export default function SearchPage() {
 
   // Data from the back end
   const [allSites, setAllSites] = useState([]);
-  const [results, setResults] = useState(null); // null = no search yet
-  const [searchedFrom, setSearchedFrom] = useState(null); // the point the current results are for
+  const [rankings, setRankings] = useState(null); // null = no search yet; else { night, drive_source, results }
+  const [calendar, setCalendar] = useState([]); // best score for each of the next 7 nights
+  const [search, setSearch] = useState(null); // { point, maxDrive } the current results are for
+  const [selectedId, setSelectedId] = useState(null); // site picked in the list or on the map
 
   // Messages for the user
+  const [loading, setLoading] = useState("");
   const [status, setStatus] = useState("Connecting to the server...");
   const [error, setError] = useState("");
 
-  // When the page first loads, get all sites from our FastAPI back end.
+  // When the page first loads, get all sites so the map isn't empty before a search.
   useEffect(() => {
     fetchSites()
       .then((sites) => {
@@ -55,6 +60,15 @@ export default function SearchPage() {
     );
   }
 
+  // Ask the server to rank sites for one night (null = tonight).
+  async function loadRankings(point, maxDrive, night) {
+    const data = await fetchRankings({ latitude: point.latitude, longitude: point.longitude, maxDrive, night });
+    setRankings(data);
+    setSelectedId(null); // nothing selected until the user clicks a row or marker
+    const when = night ? formatNight(data.night) : "tonight";
+    setStatus(`${data.results.length} sites within ${formatMinutes(maxDrive)} of ${point.label}, ranked for ${when}.`);
+  }
+
   // "Find stargazing spots" button
   async function handleSearch(event) {
     event.preventDefault(); // stop the form from reloading the page
@@ -66,32 +80,51 @@ export default function SearchPage() {
         setError("Enter a city or use your location first.");
         return;
       }
+      setLoading("Looking up that place...");
       try {
         point = await geocodePlace(locationText.trim());
       } catch {
+        setLoading("");
         setError("Couldn't reach the location lookup service. Check your internet connection.");
         return;
       }
       if (!point) {
+        setLoading("");
         setError(`Couldn't find "${locationText}". Try a city name like "Bothell" or a zip code.`);
         return;
       }
       setStartPoint(point);
     }
 
-    // Add distance + estimated drive time to every site, keep the ones within range, closest first.
-    const nearby = allSites
-      .map((site) => {
-        const miles = distanceMiles(point.latitude, point.longitude, site.latitude, site.longitude);
-        return { ...site, miles, driveMinutes: estimateDriveMinutes(miles) };
-      })
-      .filter((site) => site.driveMinutes <= maxDriveMinutes)
-      .sort((a, b) => a.driveMinutes - b.driveMinutes);
-
-    setResults(nearby);
-    setSearchedFrom(point);
-    setStatus(`${nearby.length} sites within about ${formatMinutes(maxDriveMinutes)} of ${point.label}.`);
+    setLoading("Finding the best spots and drive times...");
+    try {
+      const where = { latitude: point.latitude, longitude: point.longitude, maxDrive: maxDriveMinutes };
+      const [, nights] = await Promise.all([loadRankings(point, maxDriveMinutes, null), fetchRankingCalendar(where)]);
+      setCalendar(nights);
+      setSearch({ point, maxDrive: maxDriveMinutes });
+    } catch {
+      setError("Couldn't get rankings from the server. Is the FastAPI back end running?");
+    } finally {
+      setLoading("");
+    }
   }
+
+  // Clicking a night in the calendar re-ranks the same search for that night.
+  async function handlePickNight(night) {
+    if (!search || night === rankings?.night) return;
+    setError("");
+    setLoading(`Ranking sites for ${formatNight(night)}...`);
+    try {
+      await loadRankings(search.point, search.maxDrive, night);
+    } catch {
+      setError("Couldn't load that night. Try again.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  const results = rankings?.results;
+  const changedSinceSearch = search && maxDriveMinutes !== search.maxDrive;
 
   return (
     <main className="search-page">
@@ -133,26 +166,65 @@ export default function SearchPage() {
           <span>5 hr</span>
         </div>
 
-        <button type="submit" className="primary">
-          Find stargazing spots
+        <button type="submit" className="primary" disabled={Boolean(loading)}>
+          {loading ? "Searching..." : "Find stargazing spots"}
         </button>
+        {changedSinceSearch && <p className="note">Press the button again to update the results.</p>}
       </form>
 
-      {error && <p className="error">{error}</p>}
-      {status && <p className="status">{status}</p>}
-
-      {/* Before a search the map shows every site; after a search it shows only the results. */}
-      <MapView sites={results ?? allSites} startPoint={searchedFrom} />
-
-      {results && (
-        <section>
-          <h2>Results</h2>
-          <p className="note">
-            Drive times are estimates from straight-line distance. Real drive times and nightly scores come next.
+      {/* role="status" makes screen readers announce loading and result messages */}
+      <div role="status" aria-live="polite">
+        {loading ? (
+          <p className="loading">
+            <span className="spinner" aria-hidden="true" /> {loading}
           </p>
-          <SiteList sites={results} />
+        ) : (
+          status && <p className="status">{status}</p>
+        )}
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {results && calendar.length > 0 && (
+        <section className="calendar-section">
+          <h2>Pick a night</h2>
+          <p className="note">The best score within your drive time each night. Click a night to rank it.</p>
+          <NightCalendar
+            nights={calendar}
+            selectedNight={rankings.night}
+            onSelect={handlePickNight}
+            disabled={Boolean(loading)}
+          />
         </section>
       )}
+
+      <div className={results ? "results-layout" : undefined}>
+        {results && (
+          <section className="results-panel">
+            <h2>Best spots for {formatNight(rankings.night, { weekday: "long", month: "short", day: "numeric" })}</h2>
+            <p className="note">
+              Ranked by the night&apos;s score, with a small penalty for longer drives.{" "}
+              {rankings.drive_source === "openrouteservice"
+                ? "Drive times are real driving routes."
+                : "~ means the drive time is an estimate (real routing wasn't available)."}
+            </p>
+            <SiteList sites={results} night={rankings.night} selectedId={selectedId} onSelect={setSelectedId} />
+          </section>
+        )}
+
+        {/* Before a search the map shows every site; after a search it shows only the ranked results. */}
+        <MapView
+          sites={results ?? allSites}
+          startPoint={search?.point}
+          ranked={Boolean(results)}
+          night={rankings?.night}
+          selectedId={selectedId}
+          onSelect={results ? setSelectedId : undefined}
+        />
+      </div>
 
       {/* Site details (/sites/:siteId) open here, on top of the search page */}
       <Outlet />

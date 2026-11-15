@@ -1,4 +1,4 @@
-.search-page { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
+.search-page { max-width: 1200px; margin: 0 auto; padding: 32px 16px; }
 .search-page h1 { margin-bottom: 4px; }
 .subtitle { color: #555; margin-top: 0; }
 
@@ -15,6 +15,7 @@
 
 button { padding: 10px 14px; border-radius: 6px; font-size: 15px; cursor: pointer; }
 button.primary { background: #1f2a44; color: #fff; border: none; margin-top: 8px; }
+button:disabled { opacity: 0.6; cursor: wait; }
 button.secondary { background: #fff; border: 1px solid #1f2a44; color: #1f2a44; }
 
 .status { color: #1f6f3f; }
@@ -35,6 +36,48 @@ button.secondary { background: #fff; border: 1px solid #1f2a44; color: #1f2a44; 
 .site-table th, .site-table td { padding: 8px; border-bottom: 1px solid #e5e5e5; text-align: left; }
 .site-table th { background: #f4f5f7; }
 .site-name { font-weight: 600; }
+
+/* Loading message */
+.loading { color: #1f2a44; display: flex; align-items: center; gap: 8px; }
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 3px solid #c9cfdb; border-top-color: #1f2a44; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+
+/* 7-night calendar */
+.calendar-section h2, .results-panel h2 { margin: 8px 0 4px; font-size: 20px; }
+.calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 8px 0 20px; }
+.calendar-day {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0;
+  padding: 10px 6px; border: 2px solid transparent; border-radius: 10px; background: #eef0f3; color: #333;
+}
+.calendar-day.selected { border-color: #1f2a44; box-shadow: 0 2px 8px rgba(31, 42, 68, 0.18); }
+.calendar-date { font-size: 13px; color: #333; }
+.calendar-score { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.calendar-label { font-size: 12px; }
+.calendar-site { font-size: 11px; color: #555; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Results list beside the map on wide screens */
+.results-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.results-layout .map-wrapper { position: sticky; top: 16px; margin-top: 8px; }
+.table-scroll { max-height: 520px; overflow-y: auto; border: 1px solid #e5e5e5; border-radius: 8px; background: #fff; }
+.table-scroll .site-table th { position: sticky; top: 0; z-index: 1; }
+.site-table tbody tr { cursor: pointer; }
+.site-table tbody tr:hover { background: #f7f8fb; }
+.site-table tbody tr.selected { background: #e8ecf6; box-shadow: inset 4px 0 0 #1f2a44; }
+.row-select { padding: 0; border: none; background: none; font: inherit; font-weight: 600; color: #1a1a1a; text-align: left; cursor: pointer; }
+.row-select:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.site-region { font-size: 12px; color: #666; }
+.score-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+.score-pill.none { background: #eef0f3; color: #555; font-weight: 400; }
+
+@media (max-width: 900px) {
+  .results-layout { grid-template-columns: 1fr; }
+  .results-layout .map-wrapper { position: static; order: -1; }   /* map first, list under it */
+  .calendar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 @media (max-width: 600px) {
   .location-row { flex-direction: column; }

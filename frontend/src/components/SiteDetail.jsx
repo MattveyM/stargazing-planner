@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchForecast, fetchNights, fetchSite } from "../api";
 import { scoreLevel } from "../utils/skyColors";
 import { formatNight, formatTime } from "../utils/time";
@@ -19,6 +19,8 @@ const HOUR = 60 * 60 * 1000;
 export default function SiteDetail() {
   const { siteId } = useParams(); // from the URL: /sites/12
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pickedNight = searchParams.get("night"); // from the results list: /sites/12?night=2026-11-15
   const [site, setSite] = useState(null);
   const [nights, setNights] = useState([]);
   const [forecast, setForecast] = useState([]);
@@ -32,14 +34,15 @@ export default function SiteDetail() {
         setSite(siteData);
         setNights(nightData);
         setForecast(forecastData);
-        // Start on the best night of the week
+        // Start on the night picked in the search, or else the best night of the week
         const best = nightData.reduce((a, b) => (b.score > a.score ? b : a), nightData[0]);
-        setSelectedNight(best ? best.night : null);
+        const picked = nightData.find((n) => n.night === pickedNight);
+        setSelectedNight(picked ? picked.night : best ? best.night : null);
       })
       .catch((err) =>
         setError(err.message === "Not found" ? "That site doesn't exist." : "Can't reach the server."),
       );
-  }, [siteId]);
+  }, [siteId, pickedNight]);
 
   // Close with the Escape key, like most pop-up windows.
   useEffect(() => {
